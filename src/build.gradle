@@ -1,0 +1,28 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'org.example'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+
+}
+
+dependencies {
+    implementation 'com.google.code.gson:gson:2.10.1'
+
+    // Dependencia para la base de datos SQLite
+    implementation 'org.xerial:sqlite-jdbc:3.44.0.0'
+    testImplementation platform('org.junit:junit-bom:5.10.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+}
+
+test {
+    useJUnitPlatform()
+}
+application {
+    mainClass = 'com.icesi.chatapp.Main'
+}
