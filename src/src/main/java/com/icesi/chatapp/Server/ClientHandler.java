@@ -60,7 +60,6 @@ public class ClientHandler implements Runnable {
                     "7. Ver historial privado\n" +
                     "8. Ver historial de grupo\n" +
                     "9. Llamar a un usuario\n" +
-                    "10. Enviar imagen a usuario\n" +
                     "Elige opción:");
                 opcion = in.readLine();
 
@@ -91,11 +90,6 @@ public class ClientHandler implements Runnable {
                     case "9":
                         manejarLlamada();
                         break;
-                        case "10": {
-                        String receptor = in.readLine();
-                        recibirYReenviarImagen(receptor);
-                        break;
-}
                     default:
                         out.println("Opción no válida.");
                         break;
@@ -399,7 +393,7 @@ public class ClientHandler implements Runnable {
 
             System.out.println("Recibiendo audio: " + nombreArchivo + " (" + tamanoArchivo + " bytes) de " + clientName);
 
-            if (tamanoArchivo <= 0) {
+            if (tamanoArchivo <= 0 || tamanoArchivo > 10000000) { // Límite de 10MB
                 throw new IOException("Tamaño de archivo inválido: " + tamanoArchivo);
             }
 
@@ -408,21 +402,21 @@ public class ClientHandler implements Runnable {
             if (!carpetaAudios.exists()) {
                 carpetaAudios.mkdirs();
             }
-            
+
             String nombreUnico = System.currentTimeMillis() + "_" + clientName + "_" + nombreArchivo;
             File archivoAudio = new File(carpetaAudios, nombreUnico);
 
             // Recibir datos del archivo
             try (FileOutputStream fos = new FileOutputStream(archivoAudio);
                  BufferedOutputStream bos = new BufferedOutputStream(fos)) {
-                
+
                 byte[] buffer = new byte[4096];
                 long bytesRecibidos = 0;
 
                 while (bytesRecibidos < tamanoArchivo) {
                     int bytesParaLeer = (int) Math.min(buffer.length, tamanoArchivo - bytesRecibidos);
                     int bytesLeidos = dataIn.read(buffer, 0, bytesParaLeer);
-                    
+
                     if (bytesLeidos == -1) {
                         throw new IOException("Conexión cerrada inesperadamente");
                     }
@@ -435,7 +429,7 @@ public class ClientHandler implements Runnable {
 
             System.out.println("Audio recibido y guardado: " + archivoAudio.getPath() + " (" + archivoAudio.length() + " bytes)");
             return archivoAudio;
-            
+
         } catch (IOException e) {
             System.err.println("Error recibiendo archivo de audio de " + clientName + ": " + e.getMessage());
             throw e;
@@ -572,46 +566,30 @@ public class ClientHandler implements Runnable {
         out.println("¿A qué usuario deseas llamar?");
         String destinatario = in.readLine();
 
-        if (!users.containsKey(destinatario)) {
+        if (destinatario == null || !users.containsKey(destinatario)) {
             out.println("El usuario no está conectado.");
             return;
         }
 
         ClientHandler receptor = users.get(destinatario);
+
+        // Informar al llamante
         String ipReceptor = receptor.clientSocket.getInetAddress().getHostAddress();
+        int puertoReceptor = 12345; // Puerto fijo para simplificar
 
-        out.println("Iniciando llamada a " + destinatario + "...");
         out.println("IP_DESTINO:" + ipReceptor);
-        out.println("PUERTO_DESTINO: (no disponible)");
+        out.println("PUERTO_DESTINO:" + puertoReceptor);
 
-        receptor.out.println("Llamada entrante de " + this.clientName);
-    }
-
-private void recibirYReenviarImagen(String receptorNombre) {
-    try {
-        ClientHandler receptor = users.get(receptorNombre);
-        if (receptor == null) {
-            out.println("Usuario no conectado.");
-            return;
-        }
-
-        // Leer metadatos de imagen
-        String nombreImagen = dataIn.readUTF();
-        long tamano = dataIn.readLong();
-        byte[] imagenBytes = new byte[(int) tamano];
-        dataIn.readFully(imagenBytes);
-
-        // Enviar señal
-        receptor.out.println("IMAGEN_INCOMING");
-        receptor.dataOut.writeUTF(nombreImagen);
-        receptor.dataOut.writeLong(tamano);
-        receptor.dataOut.write(imagenBytes);
+        // Notificar al receptor
+        receptor.out.println("LLAMADA_INCOMING");
+        receptor.dataOut.writeUTF(this.clientName);
+        receptor.dataOut.writeUTF(ipReceptor);
+        receptor.dataOut.writeInt(puertoReceptor);
         receptor.dataOut.flush();
 
-    } catch (IOException e) {
-        out.println("Error al reenviar imagen.");
-        e.printStackTrace();
+        out.println("Llamada iniciada a " + destinatario);
     }
-}
+
+
 
 }

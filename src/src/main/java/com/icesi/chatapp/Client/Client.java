@@ -82,7 +82,7 @@ public class Client {
                 }
 
                 if (linea.equals("5")) {
-                    out.println("MENU_REQUEST_5");
+                    out.println(linea);
                     Thread.sleep(100);
                     System.out.println("Ingresa el nombre del usuario destinatario:");
                     String usuario = scanner.nextLine();
@@ -92,7 +92,7 @@ public class Client {
                 }
 
                 if (linea.equals("6")) {
-                    out.println("MENU_REQUEST_6");
+                    out.println(linea);
                     Thread.sleep(100);
                     System.out.println("Ingresa el nombre del grupo:");
                     String grupo = scanner.nextLine();
