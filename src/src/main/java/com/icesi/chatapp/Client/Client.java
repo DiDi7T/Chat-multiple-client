@@ -30,34 +30,63 @@ public class Client {
                         if (lineaRecibida.equals("AUDIO_INCOMING")) {
                             recibirYReproducirAudio(dataIn);
                         } else if (lineaRecibida.equals("LLAMADA_INCOMING")) {
-                            String emisor = dataIn.readUTF();
-                            String ip = dataIn.readUTF();
-                            int puerto = dataIn.readInt();
+                            try {
+                                String emisor = dataIn.readUTF();
+                                String ip = dataIn.readUTF();
+                                int puerto = dataIn.readInt();
 
-                            System.out.println("Llamada entrante de " + emisor + " desde " + ip + ":" + puerto);
-                            System.out.print("¿Aceptar llamada? (S/N): ");
-                            // Necesitamos un scanner local para este hilo o pasar el principal de forma segura
-                            // Para simplificar, creamos uno local para la respuesta
-                            Scanner respuestaScanner = new Scanner(System.in);
-                            String respuesta = respuestaScanner.nextLine();
-                            if (respuesta.equalsIgnoreCase("S")) {
-                                new Thread(() -> AudioCallReceiver.iniciarRecepcion(puerto)).start();
-                                llamadaActiva = true;
-                                out.println("CALL_ACCEPTED");
-                            } else {
-                                System.out.println("Llamada rechazada.");
-                                out.println("CALL_REJECTED");
+                                System.out.println("\n=== LLAMADA ENTRANTE ===");
+                                System.out.println("De: " + emisor);
+                                System.out.println("Desde: " + ip + ":" + puerto);
+                                System.out.print("¿Aceptar llamada? (S/N): ");
+
+                                // Usar el scanner principal de forma segura
+                                String respuesta;
+                                synchronized (enterLock) {
+                                    respuesta = new Scanner(System.in).nextLine();
+                                }
+
+                                if (respuesta.equalsIgnoreCase("S")) {
+                                    System.out.println("Aceptando llamada...");
+
+                                    // El receptor escucha en puerto + 1 y envía al puerto + 2
+                                    int puertoEscucha = puerto + 1;
+                                    int puertoEnvio = puerto + 2;
+
+                                    new Thread(() -> AudioCallReceiver.iniciarRecepcion(puertoEscucha)).start();
+                                    new Thread(() -> AudioCallSender.iniciarLlamada(ip, puertoEnvio)).start();
+
+                                    llamadaActiva = true;
+                                    out.println("CALL_ACCEPTED");
+                                    System.out.println("*** Llamada activa - Escribe '10' para terminar ***");
+                                } else {
+                                    System.out.println("Llamada rechazada.");
+                                    out.println("CALL_REJECTED");
+                                }
+                            } catch (Exception e) {
+                                System.err.println("Error al manejar llamada entrante: " + e.getMessage());
+                                e.printStackTrace();
                             }
-                            // No cerramos respuestaScanner aquí, ya que el System.in se cerraría
                         } else if (lineaRecibida.startsWith("IP_DESTINO:")) {
                             String ip = lineaRecibida.split(":")[1];
                             String puertoLine = in.readLine();
-                            int puerto = Integer.parseInt(puertoLine.split(":")[1]);
 
-                            System.out.println("Iniciando llamada con " + ip + ":" + puerto + "...");
-                            new Thread(() -> AudioCallSender.iniciarLlamada(ip, puerto)).start();
-                            new Thread(() -> AudioCallReceiver.iniciarRecepcion(puerto)).start();
-                            llamadaActiva = true;
+                            if (puertoLine != null && puertoLine.startsWith("PUERTO_DESTINO:")) {
+                                int puerto = Integer.parseInt(puertoLine.split(":")[1]);
+
+                                System.out.println("\n=== INICIANDO LLAMADA ===");
+                                System.out.println("Conectando con: " + ip + ":" + puerto);
+
+                                // El llamante envía al puerto + 1 y escucha en puerto + 2
+                                int puertoEnvio = puerto + 1;
+                                int puertoEscucha = puerto + 2;
+
+                                new Thread(() -> AudioCallSender.iniciarLlamada(ip, puertoEnvio)).start();
+                                new Thread(() -> AudioCallReceiver.iniciarRecepcion(puertoEscucha)).start();
+
+                                llamadaActiva = true;
+                                System.out.println("*** Llamada activa - Escribe '10' para terminar ***");
+                            }
                         } else {
                             System.out.println(lineaRecibida);
                         }
@@ -102,12 +131,24 @@ public class Client {
                 }
 
                 if (linea.equals("9")) {
-                    out.println("CALL_REQUEST");
+                    out.println("9");
                     Thread.sleep(100);
                     System.out.print("Nombre del usuario o grupo a llamar: ");
                     String destinatario = scanner.nextLine();
                     out.println(destinatario);
                     System.out.println("Esperando respuesta del servidor para la llamada...");
+                    continue;
+                }
+                if (linea.equals("10")) {
+                    if (llamadaActiva) {
+                        AudioCallSender.terminarLlamada();
+                        AudioCallReceiver.terminarRecepcion();
+                        llamadaActiva = false;
+                        System.out.println("Llamada terminada.");
+                        out.println("CALL_ENDED");
+                    } else {
+                        System.out.println("No hay llamada activa.");
+                    }
                     continue;
                 }
 

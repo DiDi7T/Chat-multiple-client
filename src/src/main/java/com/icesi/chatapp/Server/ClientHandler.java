@@ -60,6 +60,7 @@ public class ClientHandler implements Runnable {
                     "7. Ver historial privado\n" +
                     "8. Ver historial de grupo\n" +
                     "9. Llamar a un usuario\n" +
+
                     "Elige opción:");
                 opcion = in.readLine();
 
@@ -96,6 +97,22 @@ public class ClientHandler implements Runnable {
 
                 }
             }
+            Thread respuestaHandler = new Thread(() -> {
+                try {
+                    String mensaje;
+                    while ((mensaje = in.readLine()) != null) {
+                        if (mensaje.equals("CALL_ACCEPTED")) {
+                            System.out.println("Llamada aceptada por: " + clientName);
+                        } else if (mensaje.equals("CALL_REJECTED")) {
+                            System.out.println("Llamada rechazada por: " + clientName);
+                        }
+                    }
+                } catch (IOException e) {
+                    // Normal cuando el cliente se desconecta
+                }
+            });
+            respuestaHandler.setDaemon(true);
+            respuestaHandler.start();
 
         } catch (IOException e) {
             System.out.println("Error con el cliente " + clientName + ": " + e.getMessage());
@@ -563,6 +580,26 @@ public class ClientHandler implements Runnable {
     }
 
     private void manejarLlamada() throws IOException {
+        // Mostrar usuarios disponibles
+        List<String> disponibles = new ArrayList<>();
+        synchronized (users) {
+            for (String nombre : users.keySet()) {
+                if (!nombre.equals(this.clientName)) {
+                    disponibles.add(nombre);
+                }
+            }
+        }
+
+        if (disponibles.isEmpty()) {
+            out.println("No hay otros usuarios conectados.");
+            return;
+        }
+
+        out.println("Usuarios disponibles para llamar:");
+        for (String nombre : disponibles) {
+            out.println(" - " + nombre);
+        }
+
         out.println("¿A qué usuario deseas llamar?");
         String destinatario = in.readLine();
 
@@ -573,21 +610,32 @@ public class ClientHandler implements Runnable {
 
         ClientHandler receptor = users.get(destinatario);
 
-        // Informar al llamante
-        String ipReceptor = receptor.clientSocket.getInetAddress().getHostAddress();
-        int puertoReceptor = 12345; // Puerto fijo para simplificar
+        try {
+            // Informar al llamante
+            String ipReceptor = receptor.clientSocket.getInetAddress().getHostAddress();
+            int puertoBase = 15000; // Puerto base más alto para evitar conflictos
 
-        out.println("IP_DESTINO:" + ipReceptor);
-        out.println("PUERTO_DESTINO:" + puertoReceptor);
+            out.println("IP_DESTINO:" + ipReceptor);
+            out.println("PUERTO_DESTINO:" + puertoBase);
 
-        // Notificar al receptor
-        receptor.out.println("LLAMADA_INCOMING");
-        receptor.dataOut.writeUTF(this.clientName);
-        receptor.dataOut.writeUTF(ipReceptor);
-        receptor.dataOut.writeInt(puertoReceptor);
-        receptor.dataOut.flush();
+            // Notificar al receptor
+            receptor.out.println("LLAMADA_INCOMING");
+            receptor.dataOut.writeUTF(this.clientName);
+            receptor.dataOut.writeUTF(ipReceptor);
+            receptor.dataOut.writeInt(puertoBase);
+            receptor.dataOut.flush();
 
-        out.println("Llamada iniciada a " + destinatario);
+            System.out.println("=== LLAMADA INICIADA ===");
+            System.out.println("De: " + clientName + " → Para: " + destinatario);
+            System.out.println("IP: " + ipReceptor + ", Puerto base: " + puertoBase);
+
+            out.println("Llamada iniciada a " + destinatario + ". Esperando respuesta...");
+
+        } catch (Exception e) {
+            out.println("Error al iniciar la llamada: " + e.getMessage());
+            System.err.println("Error en llamada de " + clientName + " a " + destinatario + ": " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
 
