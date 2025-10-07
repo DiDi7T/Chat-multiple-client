@@ -38,12 +38,11 @@ public class Client {
                                 System.out.println("\n=== LLAMADA ENTRANTE ===");
                                 System.out.println("De: " + emisor);
                                 System.out.println("Desde: " + ip + ":" + puerto);
-                                System.out.print("¿Aceptar llamada? (S/N): ");
-
+                                System.out.println("¿Aceptar llamada? (S/N): Nota:Ingresa una segunda vez la respuesta (Despues del salto de linea) para efectuar dicho procedimiento");
                                 // Usar el scanner principal de forma segura
                                 String respuesta;
                                 synchronized (enterLock) {
-                                    respuesta = new Scanner(System.in).nextLine();
+                                    respuesta = new Scanner(System.in).nextLine();  
                                 }
 
                                 if (respuesta.equalsIgnoreCase("S")) {

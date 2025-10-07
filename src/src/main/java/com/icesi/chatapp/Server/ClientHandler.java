@@ -30,110 +30,103 @@ public class ClientHandler implements Runnable {
         new File("server_audios").mkdirs();
     }
 
-    @Override
-    public void run() {
-        try {
-            out.println("Ingresa tu nombre:");
-            clientName = in.readLine();
+@Override
+public void run() {
+    try {
+        out.println("Ingresa tu nombre:");
+        clientName = in.readLine();
 
-            synchronized (users) {
-                if (users.containsKey(clientName)) {
-                    out.println("Nombre ya en uso. Conexión terminada.");
-                    clientSocket.close();
-                    return;
-                }
-                users.put(clientName, this);
-            }
-
-            out.println("¡Hola " + clientName + "!");
-
-            // Menú principal
-            String opcion;
-            while (true) {
-                 out.println("\nMENU:\n" +
-                    "1. Enviar mensaje a usuario\n" +
-                    "2. Crear grupo\n" +
-                    "3. Enviar mensaje a grupo\n" +
-                    "4. Salir\n" +
-                    "5. Nota de voz privada\n" +
-                    "6. Nota de voz a grupo\n" +
-                    "7. Ver historial privado\n" +
-                    "8. Ver historial de grupo\n" +
-                    "9. Llamar a un usuario\n" +
-
-                    "Elige opción:");
-                opcion = in.readLine();
-
-                if (opcion == null || opcion.equals("4")) break;
-
-                switch (opcion) {
-                    case "1":
-                        enviarPrivado();
-                        break;
-                    case "2":
-                        crearGrupo();
-                        break;
-                    case "3":
-                        enviarAGrupo();
-                        break;
-                    case "5":
-                        manejarNotaVozPrivada();
-                        break;
-                    case "6":
-                        manejarNotaVozGrupo();
-                        break;
-                    case "7":
-                        verHistorialPrivado();
-                        break;
-                    case "8":
-                        verHistorialGrupo();
-                        break;
-                    case "9":
-                        manejarLlamada();
-                        break;
-                    default:
-                        out.println("Opción no válida.");
-                        break;
-
-                }
-            }
-            Thread respuestaHandler = new Thread(() -> {
-                try {
-                    String mensaje;
-                    while ((mensaje = in.readLine()) != null) {
-                        if (mensaje.equals("CALL_ACCEPTED")) {
-                            System.out.println("Llamada aceptada por: " + clientName);
-                        } else if (mensaje.equals("CALL_REJECTED")) {
-                            System.out.println("Llamada rechazada por: " + clientName);
-                        }
-                    }
-                } catch (IOException e) {
-                    // Normal cuando el cliente se desconecta
-                }
-            });
-            respuestaHandler.setDaemon(true);
-            respuestaHandler.start();
-
-        } catch (IOException e) {
-            System.out.println("Error con el cliente " + clientName + ": " + e.getMessage());
-        } finally {
-            try {
-                // si se desconecta el cliente, eliminar usuario y eliminarlo de grupos
-                synchronized (users) {
-                    users.remove(clientName);
-                }
-                synchronized (groups) {
-                    for (Set<ClientHandler> grupo : groups.values()) {
-                        grupo.remove(this);
-                    }
-                }
+        synchronized (users) {
+            if (users.containsKey(clientName)) {
+                out.println("Nombre ya en uso. Conexión terminada.");
                 clientSocket.close();
-                System.out.println("Cliente " + clientName + " desconectado.");
-            } catch (IOException e) {
-                e.printStackTrace();
+                return;
+            }
+            users.put(clientName, this);
+        }
+
+        out.println("¡Hola " + clientName + "!");
+
+        // Menú principal
+        String opcion;
+        while (true) {
+            out.println("\nMENU:\n" +
+                "1. Enviar mensaje a usuario\n" +
+                "2. Crear grupo\n" +
+                "3. Enviar mensaje a grupo\n" +
+                "4. Salir\n" +
+                "5. Nota de voz privada\n" +
+                "6. Nota de voz a grupo\n" +
+                "7. Ver historial privado\n" +
+                "8. Ver historial de grupo\n" +
+                "9. Llamar a un usuario\n" +
+                "Elige opción:");
+
+            opcion = in.readLine();
+
+            if (opcion == null || opcion.equals("4")) break;
+
+            switch (opcion) {
+                case "1":
+                    enviarPrivado();
+                    break;
+                case "2":
+                    crearGrupo();
+                    break;
+                case "3":
+                    enviarAGrupo();
+                    break;
+                case "5":
+                    manejarNotaVozPrivada();
+                    break;
+                case "6":
+                    manejarNotaVozGrupo();
+                    break;
+                case "7":
+                    verHistorialPrivado();
+                    break;
+                case "8":
+                    verHistorialGrupo();
+                    break;
+                case "9":
+                    manejarLlamada();
+                    break;
+
+                // 👇 Casos especiales de llamadas
+                case "CALL_ACCEPTED":
+                    System.out.println("Llamada aceptada por: " + clientName);
+                    break;
+                case "CALL_REJECTED":
+                    System.out.println("Llamada rechazada por: " + clientName);
+                    break;
+
+                default:
+                    out.println("Opción no válida.");
+                    break;
             }
         }
+
+    } catch (IOException e) {
+        System.out.println("Error con el cliente " + clientName + ": " + e.getMessage());
+    } finally {
+        try {
+            // si se desconecta el cliente, eliminar usuario y eliminarlo de grupos
+            synchronized (users) {
+                users.remove(clientName);
+            }
+            synchronized (groups) {
+                for (Set<ClientHandler> grupo : groups.values()) {
+                    grupo.remove(this);
+                }
+            }
+            clientSocket.close();
+            System.out.println("Cliente " + clientName + " desconectado.");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
+}
+
 
     private void enviarPrivado() throws IOException {
         List<String> disponibles = new ArrayList<>();
@@ -617,6 +610,8 @@ public class ClientHandler implements Runnable {
 
             out.println("IP_DESTINO:" + ipReceptor);
             out.println("PUERTO_DESTINO:" + puertoBase);
+
+
 
             // Notificar al receptor
             receptor.out.println("LLAMADA_INCOMING");
