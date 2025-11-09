@@ -253,7 +253,7 @@ app.get("/api/connected-users", async (req, res) => {
   }
 });
 
-// 🟩 OBTENER GRUPOS DEL USUARIO
+// 🟩 OBTENER GRUPOS DEL USUARIO 
 app.get("/api/user-groups", async (req, res) => {
   try {
     const { username } = req.query;
@@ -267,11 +267,21 @@ app.get("/api/user-groups", async (req, res) => {
     // Esperar menú
     await s.readUntil((t) => t.includes("MENU") || t.includes("Hola"));
 
-    // Por ahora, devolvemos una lista vacía o podrías implementar lógica para obtener grupos
-    // Esto requeriría que el servidor Java tenga un comando para listar grupos
+    // Enviar comando 9 para listar grupos
+    await s.writeLines(["9"]);
+
+    // Esperar respuesta
+    const out = await s.readUntil(
+      (t) => t.includes("=== FIN LISTA GRUPOS ===") || t.includes("MENU"),
+      400,
+      5000
+    );
+
+    const grupos = parseGrupos(out);
+
     res.json({
       ok: true,
-      groups: [] // Se puede expandir luego
+      groups: grupos
     });
 
   } catch (e) {
@@ -280,21 +290,23 @@ app.get("/api/user-groups", async (req, res) => {
   }
 });
 
-// 🟩 OBTENER TODOS LOS GRUPOS (simulado por ahora)
-app.get("/api/all-groups", async (req, res) => {
-  try {
-    // Esta es una implementación simulada
-    // En una versión real, necesitarías que el servidor Java soporte listar grupos
-    res.json({
-      ok: true,
-      groups: ["general", "developers", "friends"]
-    });
-
-  } catch (e) {
-    console.error("Error en /api/all-groups:", e);
-    res.status(400).json({ ok: false, error: e.message });
+// Función para parsear la salida y extraer nombres de grupos 
+function parseGrupos(output) {
+  const grupos = [];
+  const lines = output.split('\n');
+  
+  for (const line of lines) {
+      
+    if (line.trim().startsWith('- ')) {
+      const grupoNombre = line.trim().substring(2).trim();
+      if (grupoNombre) {
+        grupos.push(grupoNombre);
+      }
+    }
   }
-});
+  
+  return grupos;
+}
 
 // 🟩 LOGOUT MEJORADO - Único endpoint necesario
 app.post("/api/logout", async (req, res) => {

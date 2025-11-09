@@ -68,16 +68,16 @@ export const chatAPI = {
     }
   },
 
-  async getAllGroups() {
-    try {
-      const response = await fetch(`${API_BASE}/all-groups`);
-      const data = await response.json();
-      return data.ok ? { success: true, data: data.groups } : { success: false, data: [] };
-    } catch (error) {
-      console.error('Error en getAllGroups:', error);
-      return { success: false, data: [] };
-    }
-  },
+  async getUserGroups(username) {
+  try {
+    const response = await fetch(`${API_BASE}/user-groups?username=${username}`);
+    const data = await response.json();
+    return data.ok ? { success: true, data: data.groups } : { success: false, data: [] };
+  } catch (error) {
+    console.error('Error en getUserGroups:', error);
+    return { success: false, data: [] };
+  }
+},
 
   async logout(username) {
     try {

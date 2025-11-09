@@ -1,8 +1,17 @@
 package com.icesi.chatapp.Server;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.net.Socket;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class ClientHandler implements Runnable {
 
@@ -67,6 +76,11 @@ public class ClientHandler implements Runnable {
                     case "HISTORY_GROUP":
                         verHistorialGrupo();
                         break;
+
+                    case "9":
+                    case "LIST_GROUPS":
+                        listarMisGrupos();
+                        break;
                     default:
                         out.println("Comando o número no válido.");
                         break;
@@ -87,7 +101,8 @@ public class ClientHandler implements Runnable {
         out.println("Usuarios disponibles:");
         synchronized (users) {
             for (String u : users.keySet()) {
-                if (!u.equals(clientName)) out.println(" - " + u);
+                if (!u.equals(clientName))
+                    out.println(" - " + u);
             }
         }
 
@@ -124,7 +139,8 @@ public class ClientHandler implements Runnable {
         out.println("Grupo '" + nombreGrupo + "' creado.");
         out.println("Escribe los nombres de los usuarios a agregar (separados por coma):");
         String linea = in.readLine();
-        if (linea == null || linea.trim().isEmpty()) return;
+        if (linea == null || linea.trim().isEmpty())
+            return;
 
         String[] nombres = linea.split(",");
         synchronized (groups) {
@@ -187,7 +203,8 @@ public class ClientHandler implements Runnable {
             out.println("No hay historial con " + usuario);
         } else {
             out.println("=== HISTORIAL CON " + usuario.toUpperCase() + " ===");
-            for (String linea : historial) out.println(linea);
+            for (String linea : historial)
+                out.println(linea);
             out.println("=== FIN DEL HISTORIAL ===");
         }
     }
@@ -201,9 +218,40 @@ public class ClientHandler implements Runnable {
             out.println("No hay historial para el grupo " + grupo);
         } else {
             out.println("=== HISTORIAL DEL GRUPO " + grupo.toUpperCase() + " ===");
-            for (String linea : historial) out.println(linea);
+            for (String linea : historial)
+                out.println(linea);
             out.println("=== FIN DEL HISTORIAL ===");
         }
+    }
+
+    // -------------------- LISTAR GRUPOS --------------------
+    private void listarMisGrupos() {
+        List<String> misGrupos = new ArrayList<>();
+
+        synchronized (groups) {
+            for (Map.Entry<String, Set<ClientHandler>> entry : groups.entrySet()) {
+                String nombreGrupo = entry.getKey();
+                Set<ClientHandler> miembros = entry.getValue();
+
+                // Verificar si este usuario está en el grupo
+                for (ClientHandler miembro : miembros) {
+                    if (miembro.clientName != null && miembro.clientName.equals(this.clientName)) {
+                        misGrupos.add(nombreGrupo);
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (misGrupos.isEmpty()) {
+            out.println("No perteneces a ningún grupo.");
+        } else {
+            out.println("Tus grupos:");
+            for (String grupo : misGrupos) {
+                out.println("- " + grupo);
+            }
+        }
+        out.println("=== FIN LISTA GRUPOS ===");
     }
 
     // -------------------- MENÚ --------------------
@@ -213,16 +261,17 @@ public class ClientHandler implements Runnable {
     }
 
     private void enviarMenu() {
-        out.println("\nMENU:");
-        out.println("1. Enviar mensaje a usuario");
-        out.println("2. Crear grupo");
-        out.println("3. Enviar mensaje a grupo");
-        out.println("4. Salir");
-        out.println("7. Ver historial privado");
-        out.println("8. Ver historial de grupo");
-        out.println("Elige opción:");
-        out.flush();
-    }
+    out.println("\nMENU:");
+    out.println("1. Enviar mensaje a usuario");
+    out.println("2. Crear grupo");
+    out.println("3. Enviar mensaje a grupo");
+    out.println("4. Salir");
+    out.println("7. Ver historial privado");
+    out.println("8. Ver historial de grupo");
+    out.println("9. Listar mis grupos");
+    out.println("Elige opción:");
+    out.flush();
+}
 
     // -------------------- UTILIDAD --------------------
     private void desconectarUsuario() {

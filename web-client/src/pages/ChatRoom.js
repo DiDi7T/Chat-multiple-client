@@ -14,12 +14,10 @@ const ChatRoom = ({ currentUser, onLogout }) => {
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [messageLoading, setMessageLoading] = useState(false);
   
-  // 🔥 Refs para mantener estado consistente
   const currentChatRef = useRef(currentChat);
   const messagesEndRef = useRef(null);
   const lastMessageCountRef = useRef(0);
 
-  // 🔥 Función para parsear historial (mantener igual)
   const parseHistory = (historyOutput, currentUser) => {
     if (!historyOutput) return [];
     
@@ -36,9 +34,11 @@ const ChatRoom = ({ currentUser, onLogout }) => {
         continue;
       }
 
-      const messageMatch = line.match(/\[(.*?)\]\s*(.*?)\s*->\s*(.*?):\s*(.*)/);
-      if (messageMatch) {
-        const [, timestamp, sender, , content] = messageMatch;
+      const privateMatch = line.match(/\[(.*?)\]\s*(.*?)\s*->\s*(.*?):\s*(.*)/);
+      const groupMatch = line.match(/\[(.*?)\]\s*(.*?)\s*en\s*(.*?):\s*(.*)/);
+      
+      if (privateMatch) {
+        const [, timestamp, sender, , content] = privateMatch;
         const messageKey = `${timestamp}-${sender}-${content}`;
         
         if (!seenMessages.has(messageKey)) {
@@ -50,13 +50,26 @@ const ChatRoom = ({ currentUser, onLogout }) => {
             isOwn: sender.trim() === currentUser
           });
         }
+      } else if (groupMatch) {
+        const [, timestamp, sender, groupName, content] = groupMatch;
+        const messageKey = `${timestamp}-${sender}-${content}`;
+        
+        if (!seenMessages.has(messageKey)) {
+          seenMessages.add(messageKey);
+          messages.push({
+            sender: sender.trim(),
+            content: content.trim(),
+            timestamp: timestamp,
+            isOwn: sender.trim() === currentUser,
+            group: groupName.trim()
+          });
+        }
       }
     }
 
     return messages;
   };
 
-  // Cargar datos iniciales
   useEffect(() => {
     loadConnectedUsers();
     loadAllGroups();
@@ -79,11 +92,12 @@ const ChatRoom = ({ currentUser, onLogout }) => {
 
   const loadAllGroups = async () => {
     try {
-      const result = await chatAPI.getAllGroups();
+      const result = await chatAPI.getUserGroups(currentUser);
       if (result.success) {
         setGroups(result.data);
+        console.log('✅ Grupos cargados:', result.data);
       } else {
-        setGroups(['developers', 'friends', 'family']);
+        setGroups([]);
       }
     } catch (error) {
       console.error('Error loading groups:', error);
@@ -91,11 +105,9 @@ const ChatRoom = ({ currentUser, onLogout }) => {
     }
   };
 
-  // 🔥 Cargar historial - Versión mejorada con detección de cambios
   const loadChatHistory = async (chat, isAutoRefresh = false) => {
     if (!chat) return;
     
-    // No mostrar loading en auto-refresh para mejor UX
     if (!isAutoRefresh) {
       setMessageLoading(true);
     }
@@ -111,7 +123,6 @@ const ChatRoom = ({ currentUser, onLogout }) => {
       if (result.ok) {
         const parsedMessages = parseHistory(result.output, currentUser);
         
-        // 🔥 Solo actualizar si hay cambios reales
         if (parsedMessages.length !== lastMessageCountRef.current || 
             !isAutoRefresh || 
             JSON.stringify(parsedMessages) !== JSON.stringify(messages)) {
@@ -136,13 +147,11 @@ const ChatRoom = ({ currentUser, onLogout }) => {
     }
   };
 
-  // 🔥 Actualizar referencia cuando cambia el chat
   useEffect(() => {
     currentChatRef.current = currentChat;
-    lastMessageCountRef.current = messages.length; // Reset counter cuando cambia el chat
+    lastMessageCountRef.current = messages.length;
   }, [currentChat, messages.length]);
 
-  // 🔥 Cargar historial cuando cambia el chat
   useEffect(() => {
     if (currentChat) {
       loadChatHistory(currentChat);
@@ -151,15 +160,14 @@ const ChatRoom = ({ currentUser, onLogout }) => {
     }
   }, [currentChat]);
 
-  // 🔥 AUTO-REFRESH: Actualizar automáticamente cada 3 segundos cuando hay un chat activo
   useEffect(() => {
     let intervalId;
     
     if (currentChat) {
       intervalId = setInterval(() => {
         console.log('🔄 Auto-refresh del historial...');
-        loadChatHistory(currentChat, true); // true = es auto-refresh
-      }, 3000); // 🔥 Actualizar cada 3 segundos
+        loadChatHistory(currentChat, true);
+      }, 3000);
     }
     
     return () => {
@@ -167,14 +175,12 @@ const ChatRoom = ({ currentUser, onLogout }) => {
         clearInterval(intervalId);
       }
     };
-  }, [currentChat]); // 🔥 Se reinicia cuando cambia el chat
+  }, [currentChat]);
 
-  // 🔥 Auto-scroll al final de los mensajes cuando hay nuevos
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // 🔥 ENVÍO DE MENSAJES 
   const sendMessage = async () => {
     if (!newMessage.trim() || !currentChat || messageLoading) return;
 
@@ -192,7 +198,6 @@ const ChatRoom = ({ currentUser, onLogout }) => {
 
       if (result.ok) {
         console.log('✅ Mensaje enviado');
-        // 🔥 Recargar historial después de enviar (el auto-refresh se encargará del resto)
         setTimeout(() => {
           if (currentChatRef.current) {
             loadChatHistory(currentChatRef.current);
@@ -216,13 +221,21 @@ const ChatRoom = ({ currentUser, onLogout }) => {
     }
   };
 
-  const createGroup = async (groupName) => {
+  const createGroup = async (groupName, membersList = []) => {
     try {
-      const result = await chatAPI.createGroup(currentUser, groupName, []);
+      const result = await chatAPI.createGroup(currentUser, groupName, membersList);
       if (result.ok) {
-        loadAllGroups();
+        setTimeout(() => {
+          loadAllGroups();
+        }, 500);
+        
         setCurrentChat({ type: 'group', name: groupName });
-        alert('Grupo creado exitosamente');
+        
+        if (membersList.length > 0) {
+          alert(`Grupo "${groupName}" creado con ${membersList.length} miembros`);
+        } else {
+          alert('Grupo creado exitosamente');
+        }
       } else {
         alert('Error creando grupo');
       }
@@ -245,7 +258,6 @@ const ChatRoom = ({ currentUser, onLogout }) => {
     }
   };
 
-  // Actualización periódica de usuarios/grupos (cada 10 segundos)
   useEffect(() => {
     const interval = setInterval(() => {
       if (currentUser) {
