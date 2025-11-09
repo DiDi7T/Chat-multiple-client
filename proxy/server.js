@@ -221,3 +221,126 @@ app.get("/api/history/group", async (req, res) => {
 app.listen(HTTP_PORT, () => {
   console.log(`Proxy HTTP escuchando en http://localhost:${HTTP_PORT}`);
 });
+
+
+// 🟩 OBTENER USUARIOS CONECTADOS
+app.get("/api/connected-users", async (req, res) => {
+  try {
+    const { username } = req.query;
+
+    if (!username) {
+      return res.status(400).json({ ok: false, error: "username es requerido" });
+    }
+
+    const s = ensureSession(username);
+
+    // Esperar a que esté en el menú
+    await s.readUntil((t) => t.includes("MENU") || t.includes("Hola"));
+
+    // Enviar comando para listar usuarios (podrías agregar este comando al servidor Java)
+    // Por ahora, devolvemos los usuarios de las sesiones activas en el proxy
+    const connectedUsers = Array.from(sessions.keys()).filter(user => user !== username);
+
+    res.json({
+      ok: true,
+      users: connectedUsers,
+      count: connectedUsers.length
+    });
+
+  } catch (e) {
+    console.error("Error en /api/connected-users:", e);
+    res.status(400).json({ ok: false, error: e.message });
+  }
+});
+
+// 🟩 OBTENER GRUPOS DEL USUARIO
+app.get("/api/user-groups", async (req, res) => {
+  try {
+    const { username } = req.query;
+
+    if (!username) {
+      return res.status(400).json({ ok: false, error: "username es requerido" });
+    }
+
+    const s = ensureSession(username);
+
+    // Esperar menú
+    await s.readUntil((t) => t.includes("MENU") || t.includes("Hola"));
+
+    // Por ahora, devolvemos una lista vacía o podrías implementar lógica para obtener grupos
+    // Esto requeriría que el servidor Java tenga un comando para listar grupos
+    res.json({
+      ok: true,
+      groups: [] // Se puede expandir luego
+    });
+
+  } catch (e) {
+    console.error("Error en /api/user-groups:", e);
+    res.status(400).json({ ok: false, error: e.message });
+  }
+});
+
+// 🟩 OBTENER TODOS LOS GRUPOS (simulado por ahora)
+app.get("/api/all-groups", async (req, res) => {
+  try {
+    // Esta es una implementación simulada
+    // En una versión real, necesitarías que el servidor Java soporte listar grupos
+    res.json({
+      ok: true,
+      groups: ["general", "developers", "friends"]
+    });
+
+  } catch (e) {
+    console.error("Error en /api/all-groups:", e);
+    res.status(400).json({ ok: false, error: e.message });
+  }
+});
+
+// 🟩 LOGOUT MEJORADO - Único endpoint necesario
+app.post("/api/logout", async (req, res) => {
+  try {
+    const { username } = req.body;
+    
+    if (!username) {
+      return res.status(400).json({ ok: false, error: "username es requerido" });
+    }
+
+    console.log(`[LOGOUT] Cerrando sesión para: ${username}`);
+    
+    let closed = false;
+    if (sessions.has(username)) {
+      const session = sessions.get(username);
+      
+      try {
+        // Método seguro: destruir el socket sin errores
+        if (session.socket && !session.socket.destroyed) {
+          // Remover listeners problemáticos primero
+          session.socket.removeAllListeners('error');
+          session.socket.removeAllListeners('close');
+          
+          // Destruir silenciosamente
+          session.socket.destroy();
+          console.log(`[LOGOUT] Socket de ${username} destruido`);
+        }
+      } catch (e) {
+        console.log(`[LOGOUT] Error menor al destruir socket:`, e.message);
+        // Continuar aunque falle
+      }
+      
+      // Siempre eliminar la sesión
+      sessions.delete(username);
+      closed = true;
+    }
+    
+    console.log(`[LOGOUT] ${closed ? 'SESION CERRADA' : 'NO EXISTIA'} para: ${username}`);
+    res.json({ 
+      ok: true, 
+      closed: closed,
+      message: closed ? "Sesión cerrada correctamente" : "Sesión no existía" 
+    });
+    
+  } catch (e) {
+    console.error("Error en /api/logout:", e);
+    res.status(400).json({ ok: false, error: e.message });
+  }
+});
