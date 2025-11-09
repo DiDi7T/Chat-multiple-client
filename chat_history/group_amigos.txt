@@ -1,0 +1,6 @@
+[2025-11-08 18:38:33] 7 en amigos: ¡Hola grupo!
+[2025-11-08 19:00:55] samuel en amigos: ¡Hola grupo!
+[2025-11-08 19:11:22] samuel en amigos: ¡Hola grupo!
+[2025-11-08 19:12:06] samuel en amigos: undefined
+[2025-11-08 19:14:30] samuel en amigos: Hola grupo!
+[2025-11-08 19:15:02] samuel en amigos: Hola grupo!
